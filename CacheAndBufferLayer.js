@@ -134,7 +134,7 @@ exports.database.prototype.doShutdown = function(callback)
 /**
  Gets the value trough the wrapper. 
 */
-exports.database.prototype.get = function(key, callback)
+exports.database.prototype.get = function(key, callback, options)
 {
   //if cache is enabled and data is in the cache, get the value from the cache
   if(this.settings.cache > 0 && this.buffer[key])
@@ -183,7 +183,7 @@ exports.database.prototype.get = function(key, callback)
       self.logger.debug("GET    - " + key + " - " + JSON.stringify(value) + " - from database ");
 
       callback(err,value);
-    });
+    }, options);
   }
 }
 
@@ -191,7 +191,7 @@ exports.database.prototype.get = function(key, callback)
  * Find keys function searches the db sets for matching entries and
  * returns the key entries via callback.
  */
-exports.database.prototype.findKeys = function(key, notKey, callback){
+exports.database.prototype.findKeys = function(key, notKey, callback, options){
   var bufferKey=key+"-"+notKey;
   var self = this;
   this.wrappedDB.findKeys(key, notKey, function(err,keyValues)
@@ -202,13 +202,13 @@ exports.database.prototype.findKeys = function(key, notKey, callback){
     self.logger.debug("GET    - " + bufferKey + " - " + JSON.stringify(keyValues) + " - from database ");
 
     callback(err,keyValues);
-  });
+  }, options);
 }
 
 /**
  Sets the value trough the wrapper
 */
-exports.database.prototype.set = function(key, value, bufferCallback, writeCallback)
+exports.database.prototype.set = function(key, value, bufferCallback, writeCallback, options)
 {
   //writing cache is enabled, so simply write it into the buffer
   if(this.settings.writeInterval > 0)
@@ -225,6 +225,7 @@ exports.database.prototype.set = function(key, value, bufferCallback, writeCallb
     //set the new values
     this.buffer[key].value = value;
     this.buffer[key].dirty = true;
+    this.buffer[key].options = options;
     this.buffer[key].timestamp = new Date().getTime();
     
     //call the garbage collector
@@ -264,7 +265,7 @@ exports.database.prototype.set = function(key, value, bufferCallback, writeCallb
     //The value is null, means this no set operation, this is a remove operation
     if(value==null)
     {
-      this.wrappedDB.remove(key,callback);
+      this.wrappedDB.remove(key,callback, null, options);
     }
     //thats a correct value
     else
@@ -273,7 +274,7 @@ exports.database.prototype.set = function(key, value, bufferCallback, writeCallb
       if(this.settings.json == true)
         value = JSON.stringify(value);
     
-      this.wrappedDB.set(key,value,callback);
+      this.wrappedDB.set(key,value,callback, null, options);
     }
   }
 }
@@ -281,7 +282,7 @@ exports.database.prototype.set = function(key, value, bufferCallback, writeCallb
 /**
  Sets a subvalue
 */
-exports.database.prototype.setSub = function(key, sub, value, bufferCallback, writeCallback)
+exports.database.prototype.setSub = function(key, sub, value, bufferCallback, writeCallback, options)
 {
   var _this = this;
 
@@ -291,7 +292,7 @@ exports.database.prototype.setSub = function(key, sub, value, bufferCallback, wr
     //get the full value
     function(callback)
     {
-      _this.get(key, callback);
+      _this.get(key, callback, options);
     },
     //set the sub value and set the full value again 
     function(fullValue, callback)
@@ -316,7 +317,7 @@ exports.database.prototype.setSub = function(key, sub, value, bufferCallback, wr
       //set the subvalue, we're doing that with the parent element
       subvalueParent[sub[sub.length-1]] = value;
       
-      _this.set(key, fullValue, bufferCallback, writeCallback);
+      _this.set(key, fullValue, bufferCallback, writeCallback, options);
     }
   ],function(err)
   {
@@ -329,7 +330,7 @@ exports.database.prototype.setSub = function(key, sub, value, bufferCallback, wr
  Returns a sub value of the object
  @param sub is a array, for example if you want to access object.test.bla, the array is ["test", "bla"]
 */
-exports.database.prototype.getSub = function(key, sub, callback)
+exports.database.prototype.getSub = function(key, sub, callback, options)
 {
   var _this = this;
 
@@ -364,18 +365,18 @@ exports.database.prototype.getSub = function(key, sub, callback)
       _this.logger.debug("GETSUB - " + key + JSON.stringify(sub) + " - " + JSON.stringify(subvalue));
       callback(err, subvalue);
     }
-  });
+  }, options);
 }
 
 /**
  Removes the value trough the wrapper
 */
-exports.database.prototype.remove = function(key, bufferCallback, writeCallback)
+exports.database.prototype.remove = function(key, bufferCallback, writeCallback, options)
 {
   this.logger.debug("REMOVE - " + key);
 
   //make a set to null out of it
-  this.set(key, null, bufferCallback, writeCallback);
+  this.set(key, null, bufferCallback, writeCallback, options);
 }
 
 /**
@@ -452,7 +453,7 @@ function flush (db, callback)
         value = clone(value);
       
       //add the operation to the operations array
-      operations.push({"type":type, "key":key, "value":value});
+      operations.push({"type":type, "key":key, "value":value, "options": db.buffer[i].options});
       
       //collect callbacks
       callbacks = callbacks.concat(db.buffer[i].callbacks);

@@ -87,7 +87,7 @@ exports.database.prototype.remove = function (key, bufferCallback, writeCallback
   this.channels.emit(key, {"db": this.db, "options": options, "type": "remove", "key": key, "bufferCallback": bufferCallback, "writeCallback": writeCallback});
 }
 
-function doOperation (operation, callback, options)
+function doOperation (operation, callback)
 {
   if(operation.type == "get")
   {
