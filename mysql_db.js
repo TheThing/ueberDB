@@ -102,7 +102,7 @@ exports.database.prototype.get = function (key, callback, options)
     options = {table: 'store'};
   }
 
-  this.createTable(options.table, getValue);
+  this.createTable(options.table, getValue.bind(this));
 
   function getValue() {
     this.db.query("SELECT `value` FROM `" + options.table + "` WHERE  `key` = ?", [key], function(err,results)
@@ -125,7 +125,7 @@ exports.database.prototype.findKeys = function (key, notKey, callback, options)
     options = {table: 'store'};
   }
 
-  this.createTable(options.table, findKey);
+  this.createTable(options.table, findKey.bind(this));
 
   function findKey() {
     var query="SELECT `key` FROM `" + options.table + "` WHERE  `key` LIKE ?"
@@ -164,7 +164,7 @@ exports.database.prototype.set = function (key, value, callback, options)
     options = {table: 'store'};
   }
 
-  this.createTable(options.table, setValue);
+  this.createTable(options.table, setValue.bind(this));
 
   function setValue() {
     if(key.length > 100)
@@ -187,7 +187,7 @@ exports.database.prototype.remove = function (key, callback, options)
     options = {table: 'store'};
   }
 
-  this.createTable(options.table, removeValue);
+  this.createTable(options.table, removeValue.bind(this));
 
   function removeValue() {
     this.db.query("DELETE FROM `" + options.table + "` WHERE `key` = ?", [key], callback);
@@ -203,7 +203,7 @@ exports.database.prototype.doBulk = function (bulk, callback, options)
     options = {table: 'store'};
   }
 
-  this.createTable(options.table, bulkAction);
+  this.createTable(options.table, bulkAction.bind(this));
 
   function bulkAction() {
     
