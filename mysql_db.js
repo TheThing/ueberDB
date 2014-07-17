@@ -45,13 +45,25 @@ exports.database = function(settings)
 
 exports.database.prototype.init = function(callback)
 {
-  var sqlCreate = "CREATE TABLE IF NOT EXISTS `store` ( " +
+  this.created = {};
+  this.createTable('store', callback)
+}
+
+exports.database.prototype.createTable = function(name, callback)
+{
+  if (this.created[name]) {
+    return callback();
+  }
+
+  this.created[name] = true;
+
+  var sqlCreate = "CREATE TABLE IF NOT EXISTS `" + name + "` ( " +
                   "`key` VARCHAR( 100 ) NOT NULL COLLATE utf8_general_ci, " + 
                   "`value` LONGTEXT NOT NULL , " + 
                   "PRIMARY KEY (  `key` ) " +
                   ") ENGINE = MyISAM;"; 
                   
-  var sqlAlter  = "ALTER TABLE store MODIFY `key` VARCHAR(100) COLLATE utf8_general_ci;";
+  var sqlAlter  = "ALTER TABLE " + name + " MODIFY `key` VARCHAR(100) COLLATE utf8_general_ci;";
 
   var db = this.db;
   var self = this;
@@ -84,121 +96,163 @@ exports.database.prototype.init = function(callback)
   });
 }
 
-exports.database.prototype.get = function (key, callback)
+exports.database.prototype.get = function (key, callback, options)
 {
-  this.db.query("SELECT `value` FROM `store` WHERE  `key` = ?", [key], function(err,results)
-  {
-    var value = null;
-    
-    if(!err && results.length == 1)
-    {
-      value = results[0].value;
-    }
-  
-    callback(err,value);
-  });
-}
-
-exports.database.prototype.findKeys = function (key, notKey, callback)
-{
-  var query="SELECT `key` FROM `store` WHERE  `key` LIKE ?"
-    , params=[]
-  ;
-  
-  //desired keys are key, e.g. pad:%
-  key=key.replace(/\*/g,'%');
-  params.push(key);
-  
-  if(notKey!=null && notKey != undefined){
-    //not desired keys are notKey, e.g. %:%:%
-    notKey=notKey.replace(/\*/g,'%');
-    query+=" AND `key` NOT LIKE ?"
-    params.push(notKey);
+  if (!options || !options.table) {
+    options = {table: 'store'};
   }
-  this.db.query(query, params, function(err,results)
-  {
-    var value = [];
-    
-    if(!err && results.length > 0)
-    {
-      results.forEach(function(val){
-        value.push(val.key);
-      });
-    }
-  
-    callback(err,value);
-  });
-}
 
-exports.database.prototype.set = function (key, value, callback)
-{
-  if(key.length > 100)
-  {
-    callback("Your Key can only be 100 chars");
-  }
-  else
-  {
-    this.db.query("REPLACE INTO `store` VALUES (?,?)", [key, value], function(err, info){
-      callback(err);
+  this.createTable(options.table, getValue);
+
+  function getValue() {
+    this.db.query("SELECT `value` FROM `" + options.table + "` WHERE  `key` = ?", [key], function(err,results)
+    {
+      var value = null;
+      
+      if(!err && results.length == 1)
+      {
+        value = results[0].value;
+      }
+    
+      callback(err,value);
     });
   }
 }
 
-exports.database.prototype.remove = function (key, callback)
+exports.database.prototype.findKeys = function (key, notKey, callback, options)
 {
-  this.db.query("DELETE FROM `store` WHERE `key` = ?", [key], callback);
+  if (!options || !options.table) {
+    options = {table: 'store'};
+  }
+
+  this.createTable(options.table, findKey);
+
+  function findKey() {
+    var query="SELECT `key` FROM `" + options.table + "` WHERE  `key` LIKE ?"
+      , params=[]
+    ;
+    
+    //desired keys are key, e.g. pad:%
+    key=key.replace(/\*/g,'%');
+    params.push(key);
+    
+    if(notKey!=null && notKey != undefined){
+      //not desired keys are notKey, e.g. %:%:%
+      notKey=notKey.replace(/\*/g,'%');
+      query+=" AND `key` NOT LIKE ?"
+      params.push(notKey);
+    }
+    this.db.query(query, params, function(err,results)
+    {
+      var value = [];
+      
+      if(!err && results.length > 0)
+      {
+        results.forEach(function(val){
+          value.push(val.key);
+        });
+      }
+    
+      callback(err,value);
+    });
+  }
 }
 
-exports.database.prototype.doBulk = function (bulk, callback)
-{ 
-  var _this = this;
-  
-  var replaceSQL = "REPLACE INTO `store` VALUES ";
-  var removeSQL = "DELETE FROM `store` WHERE `key` IN ("
-  
-  var firstReplace = true;
-  var firstRemove = true;
-  
-  for(var i in bulk)
-  {  
-    if(bulk[i].type == "set")
+exports.database.prototype.set = function (key, value, callback, options)
+{
+  if (!options || !options.table) {
+    options = {table: 'store'};
+  }
+
+  this.createTable(options.table, setValue);
+
+  function setValue() {
+    if(key.length > 100)
     {
-      if(!firstReplace)
-        replaceSQL+=",";
-      firstReplace = false;
-    
-      replaceSQL+="(" + _this.db.escape(bulk[i].key) + ", " + _this.db.escape(bulk[i].value) + ")";
+      callback("Your Key can only be 100 chars");
     }
-    else if(bulk[i].type == "remove")
+    else
     {
-      if(!firstRemove)
-        removeSQL+=",";
-      firstRemove = false;
-    
-      removeSQL+=_this.db.escape(bulk[i].key);
+      this.db.query("REPLACE INTO `" + options.table + "` VALUES (?,?)", [key, value], function(err, info){
+        callback(err);
+      });
     }
   }
-  
-  replaceSQL+=";";
-  removeSQL+=");";
-  
-  async.parallel([
-    function(callback)
-    {
-      if(!firstReplace)
-        _this.db.query(replaceSQL, callback);
-      else
-        callback();
-    },
-    function(callback)
-    {
-      if(!firstRemove)
-        _this.db.query(removeSQL, callback);
-      else
-        callback();
+}
+
+exports.database.prototype.remove = function (key, callback, options)
+{
+
+  if (!options || !options.table) {
+    options = {table: 'store'};
+  }
+
+  this.createTable(options.table, removeValue);
+
+  function removeValue() {
+    this.db.query("DELETE FROM `" + options.table + "` WHERE `key` = ?", [key], callback);
+  }
+}
+
+exports.database.prototype.doBulk = function (bulk, callback, options)
+{ 
+  var _this = this;
+
+
+  if (!options || !options.table) {
+    options = {table: 'store'};
+  }
+
+  this.createTable(options.table, bulkAction);
+
+  function bulkAction() {
+    
+    var replaceSQL = "REPLACE INTO `" + options.table + "` VALUES ";
+    var removeSQL = "DELETE FROM `" + options.table + "` WHERE `key` IN ("
+    
+    var firstReplace = true;
+    var firstRemove = true;
+    
+    for(var i in bulk)
+    {  
+      if(bulk[i].type == "set")
+      {
+        if(!firstReplace)
+          replaceSQL+=",";
+        firstReplace = false;
+      
+        replaceSQL+="(" + _this.db.escape(bulk[i].key) + ", " + _this.db.escape(bulk[i].value) + ")";
+      }
+      else if(bulk[i].type == "remove")
+      {
+        if(!firstRemove)
+          removeSQL+=",";
+        firstRemove = false;
+      
+        removeSQL+=_this.db.escape(bulk[i].key);
+      }
     }
-  ], callback);
-  
+    
+    replaceSQL+=";";
+    removeSQL+=");";
+    
+    async.parallel([
+      function(callback)
+      {
+        if(!firstReplace)
+          _this.db.query(replaceSQL, callback);
+        else
+          callback();
+      },
+      function(callback)
+      {
+        if(!firstRemove)
+          _this.db.query(removeSQL, callback);
+        else
+          callback();
+      }
+    ], callback);
+  }
 }
 
 exports.database.prototype.close = function(callback)
