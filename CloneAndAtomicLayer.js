@@ -57,37 +57,37 @@ exports.database.prototype.doShutdown = function(callback)
   this.db.doShutdown(callback);
 }
 
-exports.database.prototype.get = function (key, callback)
+exports.database.prototype.get = function (key, callback, options)
 {
-  this.channels.emit(key, {"db": this.db, "type": "get", "key": key, "callback": callback});
+  this.channels.emit(key, {"db": this.db, "options": options, "type": "get", "key": key, "callback": callback});
 }
 
-exports.database.prototype.findKeys = function (key, notKey, callback)
+exports.database.prototype.findKeys = function (key, notKey, callback, options)
 {
-  this.channels.emit(key, {"db": this.db, "type": "findKeys", "key": key, "notKey": notKey, "callback": callback});
+  this.channels.emit(key, {"db": this.db, "options": options, "type": "findKeys", "key": key, "notKey": notKey, "callback": callback});
 }
 
-exports.database.prototype.set = function (key, value, bufferCallback, writeCallback)
+exports.database.prototype.set = function (key, value, bufferCallback, writeCallback, options)
 {
-  this.channels.emit(key, {"db": this.db, "type": "set", "key": key, "value": clone(value), "bufferCallback": bufferCallback, "writeCallback": writeCallback});
+  this.channels.emit(key, {"db": this.db, "options": options, "type": "set", "key": key, "value": clone(value), "bufferCallback": bufferCallback, "writeCallback": writeCallback});
 }
 
-exports.database.prototype.getSub = function (key, sub, callback)
+exports.database.prototype.getSub = function (key, sub, callback, options)
 {
-  this.channels.emit(key, {"db": this.db, "type": "getsub", "key": key, "sub": sub, "callback": callback});
+  this.channels.emit(key, {"db": this.db, "options": options, "type": "getsub", "key": key, "sub": sub, "callback": callback});
 }
 
-exports.database.prototype.setSub = function (key, sub, value, bufferCallback, writeCallback)
+exports.database.prototype.setSub = function (key, sub, value, bufferCallback, writeCallback, options)
 {
-  this.channels.emit(key, {"db": this.db, "type": "setsub", "key": key, "sub": sub, "value": clone(value), "bufferCallback": bufferCallback, "writeCallback": writeCallback});
+  this.channels.emit(key, {"db": this.db, "options": options, "type": "setsub", "key": key, "sub": sub, "value": clone(value), "bufferCallback": bufferCallback, "writeCallback": writeCallback});
 }
 
-exports.database.prototype.remove = function (key, bufferCallback, writeCallback)
+exports.database.prototype.remove = function (key, bufferCallback, writeCallback, options)
 {
-  this.channels.emit(key, {"db": this.db, "type": "remove", "key": key, "bufferCallback": bufferCallback, "writeCallback": writeCallback});
+  this.channels.emit(key, {"db": this.db, "options": options, "type": "remove", "key": key, "bufferCallback": bufferCallback, "writeCallback": writeCallback});
 }
 
-function doOperation (operation, callback)
+function doOperation (operation, callback, options)
 {
   if(operation.type == "get")
   {
@@ -101,7 +101,7 @@ function doOperation (operation, callback)
       
       //call the queue callback
       callback();
-    });
+    }, operation.options);
   }
   else if(operation.type == "findKeys")
   {
@@ -115,7 +115,7 @@ function doOperation (operation, callback)
       
       //call the queue callback
       callback();
-    });
+    }, operation.options);
   }
   else if(operation.type == "set")
   {  
@@ -126,7 +126,7 @@ function doOperation (operation, callback)
       
       //call the caller callback
       if(operation.bufferCallback) operation.bufferCallback(err);
-    }, operation.writeCallback);
+    }, operation.writeCallback, operation.options);
   }
   else if(operation.type == "getsub")
   {
@@ -140,7 +140,7 @@ function doOperation (operation, callback)
       
       //call the queue callback
       callback();
-    });
+    }, operation.options);
   }
   else if(operation.type == "setsub")
   {
@@ -151,7 +151,7 @@ function doOperation (operation, callback)
       
       //call the caller callback
       if(operation.bufferCallback) operation.bufferCallback(err);
-    }, operation.writeCallback);
+    }, operation.writeCallback, operation.options);
   }
   else if(operation.type == "remove")
   {
@@ -162,7 +162,7 @@ function doOperation (operation, callback)
       
       //call the caller callback
       if(operation.bufferCallback) operation.bufferCallback(err);
-    }, operation.writeCallback);
+    }, operation.writeCallback, operation.options);
   }
 }
 
